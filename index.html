@@ -1,1 +1,1103 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Anki Klonu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .cloze {
+            font-weight: bold;
+            color: #2563eb; /* Blue-600 */
+            background-color: #dbeafe; /* Blue-100 */
+            padding: 0 4px;
+            border-radius: 4px;
+        }
+        .card-content img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+        .card-content {
+            font-size: 1.25rem;
+            line-height: 1.75;
+            text-align: center;
+        }
+        .hidden-view {
+            display: none !important;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
 
+    <nav class="bg-blue-600 text-white shadow-md z-10">
+        <div class="max-w-5xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2 font-bold text-xl cursor-pointer" onclick="app.navigate('decks')">
+                    <i class="fas fa-brain"></i> Web Anki
+                </div>
+                <div class="flex space-x-1 sm:space-x-4">
+                    <button onclick="app.navigate('decks')" class="px-3 py-2 rounded hover:bg-blue-700 transition" id="nav-decks">Desteler</button>
+                    <button onclick="app.navigate('add')" class="px-3 py-2 rounded hover:bg-blue-700 transition" id="nav-add">Ekle</button>
+                    <button onclick="app.navigate('browse')" class="px-3 py-2 rounded hover:bg-blue-700 transition" id="nav-browse">Tarayıcı</button>
+                    <button onclick="app.navigate('stats')" class="px-3 py-2 rounded hover:bg-blue-700 transition" id="nav-stats">İstatistikler</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6" id="main-content">
+        
+        <!-- DECKS VIEW -->
+        <div id="view-decks" class="max-w-3xl mx-auto hidden-view">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Desteler</h1>
+                <button onclick="app.showAddDeckModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow transition">
+                    <i class="fas fa-plus mr-1"></i> Deste Oluştur
+                </button>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 text-gray-500 text-sm font-semibold uppercase tracking-wider text-left">
+                        <tr>
+                            <th class="px-6 py-3">Deste Adı</th>
+                            <th class="px-6 py-3 text-center text-blue-600" title="Yeni Kartlar">Yeni</th>
+                            <th class="px-6 py-3 text-center text-red-600" title="Öğrenme Aşamasında">Öğrenme</th>
+                            <th class="px-6 py-3 text-center text-green-600" title="Tekrar Edilecekler">Tekrar</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="decks-list">
+                        <!-- Decks will be rendered here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="no-decks-msg" class="text-center py-10 text-gray-500 hidden">
+                Henüz bir deste oluşturmadınız. Yukarıdaki butona tıklayarak başlayın.
+            </div>
+        </div>
+
+        <!-- STUDY VIEW -->
+        <div id="view-study" class="max-w-2xl mx-auto h-full flex flex-col hidden-view">
+            <div class="flex justify-between items-center mb-4 text-sm font-medium">
+                <h2 id="study-deck-name" class="text-lg font-bold text-gray-700">Deste Adı</h2>
+                <div class="flex space-x-3">
+                    <span class="text-blue-600" id="count-new">0</span>
+                    <span class="text-red-600" id="count-learn">0</span>
+                    <span class="text-green-600" id="count-review">0</span>
+                </div>
+            </div>
+
+            <div class="bg-white flex-1 rounded-xl shadow-md border border-gray-200 flex flex-col overflow-hidden relative">
+                <!-- Progress bar -->
+                <div class="h-1 w-full bg-gray-100 absolute top-0 left-0">
+                    <div id="study-progress" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+                
+                <div class="flex-1 p-6 sm:p-10 flex flex-col justify-center items-center overflow-y-auto">
+                    <!-- Front of card -->
+                    <div id="card-front" class="card-content w-full"></div>
+                    
+                    <!-- Divider -->
+                    <hr id="card-divider" class="w-full my-8 border-gray-300 hidden">
+                    
+                    <!-- Back of card -->
+                    <div id="card-back" class="card-content w-full hidden"></div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="p-4 bg-gray-50 border-t border-gray-200">
+                    <div id="btn-show-answer-container" class="flex justify-center">
+                        <button onclick="app.showAnswer()" class="bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium px-8 py-3 rounded-lg shadow w-full sm:w-auto transition">
+                            Cevabı Göster
+                        </button>
+                    </div>
+                    
+                    <div id="rate-buttons" class="grid grid-cols-4 gap-2 hidden">
+                        <button onclick="app.rateCard('again')" class="flex flex-col items-center justify-center py-2 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg border border-red-300 transition">
+                            <span class="text-xs font-semibold mb-1" id="time-again">&lt;1 dk</span>
+                            <span class="font-bold">Yeniden</span>
+                        </button>
+                        <button onclick="app.rateCard('hard')" class="flex flex-col items-center justify-center py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg border border-gray-400 transition">
+                            <span class="text-xs font-semibold mb-1" id="time-hard">6 dk</span>
+                            <span class="font-bold">Zor</span>
+                        </button>
+                        <button onclick="app.rateCard('good')" class="flex flex-col items-center justify-center py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded-lg border border-green-300 transition">
+                            <span class="text-xs font-semibold mb-1" id="time-good">10 dk</span>
+                            <span class="font-bold">İyi</span>
+                        </button>
+                        <button onclick="app.rateCard('easy')" class="flex flex-col items-center justify-center py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg border border-blue-300 transition">
+                            <span class="text-xs font-semibold mb-1" id="time-easy">4 g</span>
+                            <span class="font-bold">Kolay</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <button onclick="app.navigate('decks')" class="text-gray-500 hover:text-gray-800 underline text-sm">Destelere Dön</button>
+            </div>
+        </div>
+
+        <!-- ADD CARD VIEW -->
+        <div id="view-add" class="max-w-3xl mx-auto hidden-view">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">Yeni Kart Ekle</h1>
+            
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Kart Tipi</label>
+                        <select id="add-type" onchange="app.handleCardTypeChange()" class="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <option value="basic">Temel (Ön / Arka)</option>
+                            <option value="cloze">Boşluk Doldurma (Cloze)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Deste</label>
+                        <select id="add-deck" class="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div id="basic-fields">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ön (Soru)</label>
+                        <div class="border border-gray-300 rounded-md shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
+                            <!-- Simple toolbar -->
+                            <div class="bg-gray-50 border-b border-gray-300 p-1 flex gap-1">
+                                <button type="button" onclick="document.execCommand('bold',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="Kalın"><i class="fas fa-bold"></i></button>
+                                <button type="button" onclick="document.execCommand('italic',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="İtalik"><i class="fas fa-italic"></i></button>
+                                <button type="button" onclick="document.execCommand('underline',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="Altı Çizili"><i class="fas fa-underline"></i></button>
+                            </div>
+                            <div id="add-front" contenteditable="true" class="p-3 min-h-[100px] outline-none"></div>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Arka (Cevap)</label>
+                        <div class="border border-gray-300 rounded-md shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
+                            <!-- Simple toolbar -->
+                            <div class="bg-gray-50 border-b border-gray-300 p-1 flex gap-1">
+                                <button type="button" onclick="document.execCommand('bold',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="Kalın"><i class="fas fa-bold"></i></button>
+                                <button type="button" onclick="document.execCommand('italic',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="İtalik"><i class="fas fa-italic"></i></button>
+                                <button type="button" onclick="document.execCommand('underline',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="Altı Çizili"><i class="fas fa-underline"></i></button>
+                            </div>
+                            <div id="add-back" contenteditable="true" class="p-3 min-h-[100px] outline-none"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="cloze-fields" class="hidden">
+                    <div class="mb-2 bg-blue-50 text-blue-800 text-sm p-3 rounded border border-blue-200">
+                        <p><strong>İpucu:</strong> Kapatmak istediğiniz kelimeyi seçin ve "Boşluk Oluştur" butonuna basın. (Kısayol yoktur). Örn: Ankara {{c1::Türkiye'nin}} başkentidir.</p>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Metin (Cloze)</label>
+                        <div class="border border-gray-300 rounded-md shadow-sm overflow-hidden focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
+                            <!-- Simple toolbar with Cloze button -->
+                            <div class="bg-gray-50 border-b border-gray-300 p-1 flex gap-1">
+                                <button type="button" onclick="document.execCommand('bold',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="Kalın"><i class="fas fa-bold"></i></button>
+                                <button type="button" onclick="document.execCommand('italic',false,null)" class="p-1 hover:bg-gray-200 rounded w-8" title="İtalik"><i class="fas fa-italic"></i></button>
+                                <div class="w-px bg-gray-300 mx-1"></div>
+                                <button type="button" onclick="app.insertCloze()" class="px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 border border-blue-300 rounded" title="Boşluk Doldurma Ekle">Boşluk Oluştur [...]</button>
+                            </div>
+                            <div id="add-cloze-text" contenteditable="true" class="p-3 min-h-[150px] outline-none"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button id="add-success-msg" class="text-green-600 font-medium opacity-0 transition-opacity flex items-center"><i class="fas fa-check-circle mr-1"></i> Eklendi</button>
+                    <button onclick="app.addCard()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-md shadow transition">Ekle</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BROWSE VIEW -->
+        <div id="view-browse" class="max-w-5xl mx-auto hidden-view flex flex-col h-full">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4">Kart Tarayıcısı</h1>
+            
+            <div class="flex gap-2 mb-4">
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    <input type="text" id="browse-search" onkeyup="app.renderBrowseTable()" placeholder="Kartlarda ara..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <select id="browse-deck-filter" onchange="app.renderBrowseTable()" class="border border-gray-300 rounded-md shadow-sm p-2 outline-none max-w-[200px]">
+                    <option value="all">Tüm Desteler</option>
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
+                <div class="overflow-y-auto flex-1">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Ön Yüz</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Arka Yüz</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deste</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Durum</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="browse-tbody" class="bg-white divide-y divide-gray-200 text-sm">
+                            <!-- Cards populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATS VIEW -->
+        <div id="view-stats" class="max-w-4xl mx-auto hidden-view">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">İstatistikler</h1>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center">
+                    <div class="text-4xl font-bold text-blue-600 mb-2" id="stat-total">0</div>
+                    <div class="text-gray-500 font-medium uppercase text-sm tracking-wider">Toplam Kart</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center">
+                    <div class="text-4xl font-bold text-green-600 mb-2" id="stat-studied-today">0</div>
+                    <div class="text-gray-500 font-medium uppercase text-sm tracking-wider">Bugün Çalışılan</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center justify-center">
+                    <div class="text-4xl font-bold text-red-600 mb-2" id="stat-due">0</div>
+                    <div class="text-gray-500 font-medium uppercase text-sm tracking-wider">Bekleyen Tekrar</div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 class="text-lg font-bold text-gray-700 mb-4 border-b pb-2">Kart Durumları Dağılımı</h3>
+                <div class="flex h-8 w-full rounded-md overflow-hidden bg-gray-100 mb-2" id="stat-bar">
+                    <!-- Progress bar fills -->
+                </div>
+                <div class="flex justify-between text-sm text-gray-600">
+                    <div class="flex items-center"><div class="w-3 h-3 bg-blue-500 rounded-full mr-1"></div> Yeni: <span id="stat-new-count" class="font-bold ml-1">0</span></div>
+                    <div class="flex items-center"><div class="w-3 h-3 bg-red-500 rounded-full mr-1"></div> Öğrenilen: <span id="stat-learn-count" class="font-bold ml-1">0</span></div>
+                    <div class="flex items-center"><div class="w-3 h-3 bg-green-500 rounded-full mr-1"></div> Gözden Geçirilen: <span id="stat-review-count" class="font-bold ml-1">0</span></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODALS -->
+    
+    <!-- Add Deck Modal -->
+    <div id="modal-add-deck" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-900">Yeni Deste Oluştur</h3>
+                <button onclick="app.closeModals()" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <input type="text" id="new-deck-name" placeholder="Deste adı (örn: Almanca C1)" class="w-full border border-gray-300 rounded p-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" autocomplete="off" onkeyup="if(event.key==='Enter') app.createDeck()">
+            </div>
+            <div class="bg-gray-50 px-6 py-3 flex justify-end gap-2 rounded-b-lg">
+                <button onclick="app.closeModals()" class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition">İptal</button>
+                <button onclick="app.createDeck()" class="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 transition shadow">Oluştur</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="modal-alert" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+            <div class="p-6 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
+                    <i class="fas fa-info text-blue-600 text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2" id="alert-title">Bilgi</h3>
+                <p class="text-sm text-gray-500" id="alert-message">Mesaj buraya gelecek.</p>
+            </div>
+            <div class="bg-gray-50 px-6 py-3 flex justify-center">
+                <button onclick="app.closeModals()" class="px-6 py-2 w-full text-white bg-blue-600 rounded hover:bg-blue-700 transition shadow font-medium">Tamam</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Web Anki Clone App Logic
+         * Uses LocalStorage to persist data.
+         * Implements a simplified SM-2 spaced repetition algorithm.
+         */
+        const app = {
+            // Data state
+            data: {
+                decks: [], // { id, name, created }
+                cards: [], // { id, deckId, front, back, type, state, dueDate, interval, ease, step, lapses }
+                stats: { studiedToday: 0, lastStudyDate: null }
+            },
+            
+            // App state
+            currentView: 'decks',
+            activeDeckId: null,
+            studyQueue: [],
+            currentCard: null,
+            clozeIndexTracker: 1,
+
+            // SM-2 Constants simplified
+            LEARNING_STEPS: [1, 10], // Minutes
+            GRADUATING_INTERVAL: 1, // Days
+            EASY_INTERVAL: 4, // Days
+            STARTING_EASE: 2.5,
+            MIN_EASE: 1.3,
+
+            // --- INITIALIZATION ---
+            init: function() {
+                this.loadData();
+                this.checkDailyStats();
+                
+                // If no decks exist, create a default one
+                if (this.data.decks.length === 0) {
+                    this._createDeck("Varsayılan");
+                }
+                
+                this.navigate('decks');
+                
+                // Event listener for escape key to close modals
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') this.closeModals();
+                });
+            },
+
+            loadData: function() {
+                const stored = localStorage.getItem('webAnkiData');
+                if (stored) {
+                    try {
+                        this.data = JSON.parse(stored);
+                        // Migrate older data if necessary
+                        if(!this.data.stats) this.data.stats = { studiedToday: 0, lastStudyDate: null };
+                    } catch (e) {
+                        console.error("Data parse error", e);
+                    }
+                }
+            },
+
+            saveData: function() {
+                localStorage.setItem('webAnkiData', JSON.stringify(this.data));
+            },
+
+            checkDailyStats: function() {
+                const today = new Date().toDateString();
+                if (this.data.stats.lastStudyDate !== today) {
+                    this.data.stats.studiedToday = 0;
+                    this.data.stats.lastStudyDate = today;
+                    this.saveData();
+                }
+            },
+
+            // --- NAVIGATION ---
+            navigate: function(viewId) {
+                // Hide all views
+                document.getElementById('view-decks').classList.add('hidden-view');
+                document.getElementById('view-study').classList.add('hidden-view');
+                document.getElementById('view-add').classList.add('hidden-view');
+                document.getElementById('view-browse').classList.add('hidden-view');
+                document.getElementById('view-stats').classList.add('hidden-view');
+                
+                // Reset nav styles
+                const navLinks = ['decks', 'add', 'browse', 'stats'];
+                navLinks.forEach(id => {
+                    document.getElementById(`nav-${id}`).classList.remove('bg-blue-800', 'font-bold');
+                });
+
+                // Show active view
+                document.getElementById(`view-${viewId}`).classList.remove('hidden-view');
+                if(document.getElementById(`nav-${viewId}`)) {
+                    document.getElementById(`nav-${viewId}`).classList.add('bg-blue-800', 'font-bold');
+                }
+
+                this.currentView = viewId;
+
+                // View specific logic
+                if (viewId === 'decks') this.renderDecks();
+                if (viewId === 'add') this.setupAddView();
+                if (viewId === 'browse') this.setupBrowseView();
+                if (viewId === 'stats') this.renderStats();
+            },
+
+            // --- MODALS ---
+            showAddDeckModal: function() {
+                document.getElementById('modal-add-deck').classList.remove('hidden');
+                setTimeout(() => document.getElementById('new-deck-name').focus(), 100);
+            },
+
+            closeModals: function() {
+                document.getElementById('modal-add-deck').classList.add('hidden');
+                document.getElementById('modal-alert').classList.add('hidden');
+                document.getElementById('new-deck-name').value = '';
+            },
+
+            showAlert: function(title, message) {
+                document.getElementById('alert-title').innerText = title;
+                document.getElementById('alert-message').innerText = message;
+                document.getElementById('modal-alert').classList.remove('hidden');
+            },
+
+            // --- DECK MANAGEMENT ---
+            createDeck: function() {
+                const nameInput = document.getElementById('new-deck-name');
+                const name = nameInput.value.trim();
+                
+                if (!name) return;
+
+                if (this.data.decks.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+                    this.showAlert("Hata", "Bu isimde bir deste zaten var.");
+                    return;
+                }
+
+                this._createDeck(name);
+                this.closeModals();
+                if (this.currentView === 'decks') this.renderDecks();
+                if (this.currentView === 'add') this.setupAddView();
+            },
+
+            _createDeck: function(name) {
+                const deck = {
+                    id: 'deck_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+                    name: name,
+                    created: Date.now()
+                };
+                this.data.decks.push(deck);
+                this.saveData();
+            },
+
+            getDeckStats: function(deckId) {
+                const now = Date.now();
+                let newC = 0, learnC = 0, reviewC = 0;
+
+                this.data.cards.forEach(card => {
+                    if (card.deckId !== deckId) return;
+                    
+                    if (card.state === 'new') {
+                        newC++;
+                    } else if (card.state === 'learning') {
+                        if (card.dueDate <= now) learnC++;
+                    } else if (card.state === 'review') {
+                        if (card.dueDate <= now) reviewC++;
+                    }
+                });
+
+                return { newC, learnC, reviewC, totalDue: newC + learnC + reviewC, total: this.data.cards.filter(c=>c.deckId===deckId).length };
+            },
+
+            renderDecks: function() {
+                const tbody = document.getElementById('decks-list');
+                const noDecksMsg = document.getElementById('no-decks-msg');
+                tbody.innerHTML = '';
+
+                if (this.data.decks.length === 0) {
+                    noDecksMsg.classList.remove('hidden');
+                    return;
+                }
+                noDecksMsg.classList.add('hidden');
+
+                // Sort decks alphabetically
+                const sortedDecks = [...this.data.decks].sort((a,b) => a.name.localeCompare(b.name));
+
+                sortedDecks.forEach(deck => {
+                    const stats = this.getDeckStats(deck.id);
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-blue-50 cursor-pointer transition";
+                    tr.onclick = () => this.startStudy(deck.id);
+                    
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${deck.name}</div>
+                            <div class="text-xs text-gray-500">${stats.total} kart</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold ${stats.newC > 0 ? 'text-blue-600' : 'text-gray-300'}">${stats.newC}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold ${stats.learnC > 0 ? 'text-red-600' : 'text-gray-300'}">${stats.learnC}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold ${stats.reviewC > 0 ? 'text-green-600' : 'text-gray-300'}">${stats.reviewC}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            },
+
+            // --- ADD CARDS ---
+            setupAddView: function() {
+                const select = document.getElementById('add-deck');
+                select.innerHTML = '';
+                this.data.decks.sort((a,b) => a.name.localeCompare(b.name)).forEach(deck => {
+                    const opt = document.createElement('option');
+                    opt.value = deck.id;
+                    opt.textContent = deck.name;
+                    select.appendChild(opt);
+                });
+                
+                // Select active deck if exists
+                if(this.activeDeckId && select.querySelector(`option[value="${this.activeDeckId}"]`)){
+                    select.value = this.activeDeckId;
+                }
+
+                this.handleCardTypeChange();
+                
+                // Clear fields
+                document.getElementById('add-front').innerHTML = '';
+                document.getElementById('add-back').innerHTML = '';
+                document.getElementById('add-cloze-text').innerHTML = '';
+                this.clozeIndexTracker = 1;
+            },
+
+            handleCardTypeChange: function() {
+                const type = document.getElementById('add-type').value;
+                if (type === 'basic') {
+                    document.getElementById('basic-fields').classList.remove('hidden');
+                    document.getElementById('cloze-fields').classList.add('hidden');
+                    document.getElementById('add-front').focus();
+                } else {
+                    document.getElementById('basic-fields').classList.add('hidden');
+                    document.getElementById('cloze-fields').classList.remove('hidden');
+                    document.getElementById('add-cloze-text').focus();
+                }
+            },
+
+            insertCloze: function() {
+                const selection = window.getSelection();
+                if (!selection.rangeCount) return;
+                
+                const text = selection.toString();
+                if (!text) {
+                    this.showAlert("Bilgi", "Lütfen boşluk yapmak istediğiniz kelimeyi seçin.");
+                    return;
+                }
+
+                // Format: {{c1::selected text}}
+                const clozeText = `{{c${this.clozeIndexTracker}::${text}}}`;
+                document.execCommand('insertText', false, clozeText);
+                this.clozeIndexTracker++;
+            },
+
+            addCard: function() {
+                const deckId = document.getElementById('add-deck').value;
+                const type = document.getElementById('add-type').value;
+                
+                if (!deckId) {
+                    this.showAlert("Hata", "Lütfen bir deste seçin.");
+                    return;
+                }
+
+                let newCards = []; // Cloze can generate multiple cards
+
+                if (type === 'basic') {
+                    let front = document.getElementById('add-front').innerHTML.trim();
+                    let back = document.getElementById('add-back').innerHTML.trim();
+                    
+                    // Remove empty tags that contenteditable might create
+                    if (front === '<br>') front = '';
+                    if (back === '<br>') back = '';
+
+                    if (!front || !back) {
+                        this.showAlert("Hata", "Lütfen Ön ve Arka yüzleri doldurun.");
+                        return;
+                    }
+
+                    newCards.push(this._createNewCardObj(deckId, type, front, back));
+                    
+                    // Clear inputs for next
+                    document.getElementById('add-front').innerHTML = '';
+                    document.getElementById('add-back').innerHTML = '';
+                    document.getElementById('add-front').focus();
+
+                } else if (type === 'cloze') {
+                    let text = document.getElementById('add-cloze-text').innerHTML.trim();
+                    if (text === '<br>') text = '';
+                    
+                    if (!text) {
+                        this.showAlert("Hata", "Lütfen metin girin.");
+                        return;
+                    }
+
+                    // Regex to find all {{cX::...}}
+                    const clozeRegex = /{{c(\d+)::.*?}}/g;
+                    let match;
+                    let clozeIndices = new Set();
+                    
+                    while ((match = clozeRegex.exec(text)) !== null) {
+                        clozeIndices.add(parseInt(match[1]));
+                    }
+
+                    if (clozeIndices.size === 0) {
+                        this.showAlert("Hata", "Metinde hiç cloze boşluğu bulunamadı. Lütfen 'Boşluk Oluştur' butonunu kullanın.");
+                        return;
+                    }
+
+                    // Create a card for each unique cloze index
+                    clozeIndices.forEach(index => {
+                        newCards.push(this._createNewCardObj(deckId, type, text, '', index));
+                    });
+
+                    // Clear
+                    document.getElementById('add-cloze-text').innerHTML = '';
+                    this.clozeIndexTracker = 1;
+                    document.getElementById('add-cloze-text').focus();
+                }
+
+                // Add to database
+                this.data.cards.push(...newCards);
+                this.saveData();
+
+                // Show success feedback
+                const msg = document.getElementById('add-success-msg');
+                msg.classList.remove('opacity-0');
+                setTimeout(() => msg.classList.add('opacity-0'), 2000);
+            },
+
+            _createNewCardObj: function(deckId, type, front, back, clozeIndex = 0) {
+                return {
+                    id: 'card_' + Date.now() + '_' + Math.floor(Math.random()*10000),
+                    deckId: deckId,
+                    type: type,
+                    front: front,
+                    back: back,
+                    clozeIndex: clozeIndex, // Used for cloze cards
+                    
+                    // Spaced Repetition State
+                    state: 'new', // new, learning, review
+                    step: 0, // index in LEARNING_STEPS
+                    dueDate: Date.now(), // timestamp
+                    interval: 0, // in days
+                    ease: this.STARTING_EASE,
+                    lapses: 0
+                };
+            },
+
+            // --- STUDY MODE ---
+            startStudy: function(deckId) {
+                this.activeDeckId = deckId;
+                const deck = this.data.decks.find(d => d.id === deckId);
+                
+                // Build queue
+                this.buildStudyQueue(deckId);
+                
+                if (this.studyQueue.length === 0) {
+                    this.showAlert("Tebrikler!", "Bu deste için şu an çalışılacak kart bulunmuyor.");
+                    return;
+                }
+
+                document.getElementById('study-deck-name').innerText = deck.name;
+                this.navigate('study');
+                this.nextCard();
+            },
+
+            buildStudyQueue: function(deckId) {
+                const now = Date.now();
+                
+                // Gather due cards
+                let learningCards = [];
+                let reviewCards = [];
+                let newCards = [];
+
+                this.data.cards.forEach(card => {
+                    if (card.deckId !== deckId) return;
+
+                    if (card.state === 'learning' && card.dueDate <= now) {
+                        learningCards.push(card);
+                    } else if (card.state === 'review' && card.dueDate <= now) {
+                        reviewCards.push(card);
+                    } else if (card.state === 'new') {
+                        newCards.push(card);
+                    }
+                });
+
+                // Simple ordering: Learning first, then Review, then New
+                // In a real app, limits per day apply here.
+                
+                // Shuffle new cards
+                newCards.sort(() => Math.random() - 0.5);
+
+                this.studyQueue = [...learningCards, ...reviewCards, ...newCards];
+                
+                // Update header counts
+                document.getElementById('count-new').innerText = newCards.length;
+                document.getElementById('count-learn').innerText = learningCards.length;
+                document.getElementById('count-review').innerText = reviewCards.length;
+                
+                // Reset progress
+                document.getElementById('study-progress').style.width = '0%';
+                this.initialQueueSize = this.studyQueue.length;
+            },
+
+            nextCard: function() {
+                if (this.studyQueue.length === 0) {
+                    this.showAlert("Bitti!", "Bugünlük bu destedeki tüm kartları tamamladınız.");
+                    this.navigate('decks');
+                    return;
+                }
+
+                // Update progress bar
+                const remaining = this.studyQueue.length;
+                const done = this.initialQueueSize - remaining;
+                const pct = (done / this.initialQueueSize) * 100;
+                document.getElementById('study-progress').style.width = `${pct}%`;
+
+                // Pop first card
+                this.currentCard = this.studyQueue[0];
+                
+                this.renderCardFront(this.currentCard);
+                
+                document.getElementById('card-divider').classList.add('hidden');
+                document.getElementById('card-back').classList.add('hidden');
+                document.getElementById('rate-buttons').classList.add('hidden');
+                document.getElementById('btn-show-answer-container').classList.remove('hidden');
+            },
+
+            renderCardFront: function(card) {
+                const frontEl = document.getElementById('card-front');
+                
+                if (card.type === 'basic') {
+                    frontEl.innerHTML = card.front;
+                } else if (card.type === 'cloze') {
+                    // Replace the target cloze with [...] and format other clozes to normal text
+                    let content = card.front;
+                    const regex = /{{c(\d+)::(.*?)}}/g;
+                    
+                    content = content.replace(regex, (match, p1, p2) => {
+                        if (parseInt(p1) === card.clozeIndex) {
+                            return `<span class="cloze">[...]</span>`;
+                        } else {
+                            // Strip other clozes
+                            return p2;
+                        }
+                    });
+                    frontEl.innerHTML = content;
+                }
+            },
+
+            showAnswer: function() {
+                document.getElementById('btn-show-answer-container').classList.add('hidden');
+                document.getElementById('card-divider').classList.remove('hidden');
+                document.getElementById('card-back').classList.remove('hidden');
+                document.getElementById('rate-buttons').classList.remove('hidden');
+
+                const backEl = document.getElementById('card-back');
+                const card = this.currentCard;
+
+                if (card.type === 'basic') {
+                    backEl.innerHTML = card.back;
+                } else if (card.type === 'cloze') {
+                    // Reveal the target cloze, keep others stripped
+                    let content = card.front;
+                    const regex = /{{c(\d+)::(.*?)}}/g;
+                    
+                    content = content.replace(regex, (match, p1, p2) => {
+                        if (parseInt(p1) === card.clozeIndex) {
+                            return `<span class="cloze">${p2}</span>`;
+                        } else {
+                            return p2;
+                        }
+                    });
+                    backEl.innerHTML = content;
+                }
+
+                this.calculateNextIntervals(card);
+            },
+
+            calculateNextIntervals: function(card) {
+                // Calculate simulated times for the buttons
+                // Returns objects like { label: "10 dk", val: timestamp }
+                
+                const now = Date.now();
+                const minMs = 60 * 1000;
+                const dayMs = 24 * 60 * 60 * 1000;
+
+                let againStr, hardStr, goodStr, easyStr;
+
+                if (card.state === 'new' || card.state === 'learning') {
+                    // Learning phase
+                    againStr = "<1 dk";
+                    
+                    if (card.step === 0) {
+                        hardStr = "6 dk";
+                        goodStr = "10 dk";
+                        easyStr = "4 g";
+                    } else {
+                        hardStr = "10 dk";
+                        goodStr = "1 g";
+                        easyStr = "4 g";
+                    }
+                } else {
+                    // Review phase
+                    againStr = "10 dk";
+                    
+                    // Simplified SM-2 formulas for interval calculation
+                    let currentInterval = card.interval === 0 ? 1 : card.interval;
+                    
+                    let hardInt = Math.max(currentInterval * 1.2, currentInterval + 1);
+                    let goodInt = Math.max(currentInterval * card.ease, currentInterval + 1);
+                    let easyInt = Math.max(currentInterval * card.ease * 1.3, currentInterval + 1);
+
+                    hardStr = this.formatDays(hardInt);
+                    goodStr = this.formatDays(goodInt);
+                    easyStr = this.formatDays(easyInt);
+                }
+
+                document.getElementById('time-again').innerText = againStr;
+                document.getElementById('time-hard').innerText = hardStr;
+                document.getElementById('time-good').innerText = goodStr;
+                document.getElementById('time-easy').innerText = easyStr;
+            },
+
+            formatDays: function(days) {
+                if (days < 1) return "<1 g";
+                if (days < 30) return Math.round(days) + " g";
+                if (days < 365) return Math.round(days/30.4) + " a";
+                return (days/365).toFixed(1) + " y";
+            },
+
+            rateCard: function(rating) {
+                const card = this.currentCard;
+                const now = Date.now();
+                const minMs = 60 * 1000;
+                const dayMs = 24 * 60 * 60 * 1000;
+
+                // Record stat
+                this.data.stats.studiedToday++;
+                this.checkDailyStats();
+
+                if (card.state === 'new') {
+                    card.state = 'learning';
+                    card.step = 0;
+                }
+
+                if (card.state === 'learning') {
+                    if (rating === 'again') {
+                        card.step = 0;
+                        card.dueDate = now + (this.LEARNING_STEPS[0] * minMs);
+                    } else if (rating === 'hard') {
+                        card.dueDate = now + ((this.LEARNING_STEPS[card.step] + 5) * minMs);
+                    } else if (rating === 'good') {
+                        card.step++;
+                        if (card.step >= this.LEARNING_STEPS.length) {
+                            // Graduate
+                            card.state = 'review';
+                            card.interval = this.GRADUATING_INTERVAL;
+                            card.dueDate = now + (card.interval * dayMs);
+                        } else {
+                            card.dueDate = now + (this.LEARNING_STEPS[card.step] * minMs);
+                        }
+                    } else if (rating === 'easy') {
+                        // Graduate instantly
+                        card.state = 'review';
+                        card.interval = this.EASY_INTERVAL;
+                        card.dueDate = now + (card.interval * dayMs);
+                    }
+                } else if (card.state === 'review') {
+                    if (rating === 'again') {
+                        card.lapses++;
+                        card.ease = Math.max(this.MIN_EASE, card.ease - 0.2);
+                        card.interval = 1; // Reset to 1 day (simplification)
+                        card.state = 'learning';
+                        card.step = 0;
+                        card.dueDate = now + (10 * minMs);
+                    } else {
+                        if (rating === 'hard') {
+                            card.ease = Math.max(this.MIN_EASE, card.ease - 0.15);
+                            card.interval = card.interval * 1.2;
+                        } else if (rating === 'good') {
+                            // ease stays same
+                            card.interval = card.interval * card.ease;
+                        } else if (rating === 'easy') {
+                            card.ease += 0.15;
+                            card.interval = card.interval * card.ease * 1.3;
+                        }
+                        card.dueDate = now + (card.interval * dayMs);
+                    }
+                }
+
+                // Save changes
+                const idx = this.data.cards.findIndex(c => c.id === card.id);
+                if(idx !== -1) this.data.cards[idx] = card;
+                this.saveData();
+
+                // Remove from current queue if it's not due today anymore
+                // For simplicity in this session, if rated anything but 'again' and it's a future day, remove it.
+                // If it's learning and due in minutes, we can keep it in queue or push to back.
+                
+                this.studyQueue.shift(); // Remove current
+
+                if (card.dueDate <= now + (20 * minMs)) {
+                    // Due soon, push to back of queue
+                    this.studyQueue.push(card);
+                }
+
+                // Refresh counts dynamically
+                this.updateStudyCounts();
+                this.nextCard();
+            },
+
+            updateStudyCounts: function() {
+                let newC=0, learnC=0, reviewC=0;
+                this.studyQueue.forEach(c => {
+                    if(c.state === 'new') newC++;
+                    else if (c.state === 'learning') learnC++;
+                    else if (c.state === 'review') reviewC++;
+                });
+                document.getElementById('count-new').innerText = newC;
+                document.getElementById('count-learn').innerText = learnC;
+                document.getElementById('count-review').innerText = reviewC;
+            },
+
+            // --- BROWSE ---
+            setupBrowseView: function() {
+                const select = document.getElementById('browse-deck-filter');
+                // Keep 'all' option, remove others
+                while(select.options.length > 1) select.remove(1);
+                
+                this.data.decks.sort((a,b) => a.name.localeCompare(b.name)).forEach(deck => {
+                    const opt = document.createElement('option');
+                    opt.value = deck.id;
+                    opt.textContent = deck.name;
+                    select.appendChild(opt);
+                });
+                
+                document.getElementById('browse-search').value = '';
+                this.renderBrowseTable();
+            },
+
+            renderBrowseTable: function() {
+                const tbody = document.getElementById('browse-tbody');
+                tbody.innerHTML = '';
+                
+                const search = document.getElementById('browse-search').value.toLowerCase();
+                const deckFilter = document.getElementById('browse-deck-filter').value;
+
+                // Build a quick deck map
+                const deckMap = {};
+                this.data.decks.forEach(d => deckMap[d.id] = d.name);
+
+                let count = 0;
+
+                for (let i = this.data.cards.length - 1; i >= 0; i--) {
+                    if (count > 100) break; // Limit render for perf
+                    
+                    const card = this.data.cards[i];
+                    if (deckFilter !== 'all' && card.deckId !== deckFilter) continue;
+                    
+                    // Simple text extraction for search (removing html)
+                    const temp = document.createElement('div');
+                    temp.innerHTML = card.front + " " + card.back;
+                    const textContent = temp.textContent || temp.innerText || "";
+                    
+                    if (search && !textContent.toLowerCase().includes(search)) continue;
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50";
+
+                    // Format state
+                    let stateBadge = '';
+                    if (card.state === 'new') stateBadge = '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Yeni</span>';
+                    else if (card.state === 'learning') stateBadge = '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Öğrenme</span>';
+                    else stateBadge = '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Tekrar</span>';
+
+                    // Format front preview (strip HTML and truncate)
+                    temp.innerHTML = card.front;
+                    let frontText = temp.textContent.substring(0, 50);
+                    if(temp.textContent.length > 50) frontText += '...';
+
+                    // Format back preview
+                    temp.innerHTML = card.back;
+                    let backText = temp.textContent.substring(0, 50);
+                    if (card.type === 'cloze') backText = "(Cloze Kartı)";
+                    else if (temp.textContent.length > 50) backText += '...';
+
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 border-b border-gray-200 text-gray-800 truncate max-w-[200px]" title="${temp.textContent}">${frontText}</td>
+                        <td class="px-4 py-3 border-b border-gray-200 text-gray-500 truncate max-w-[200px]">${backText}</td>
+                        <td class="px-4 py-3 border-b border-gray-200 text-gray-500">${deckMap[card.deckId] || 'Bilinmeyen'}</td>
+                        <td class="px-4 py-3 border-b border-gray-200">${stateBadge}</td>
+                        <td class="px-4 py-3 border-b border-gray-200 text-right">
+                            <button onclick="app.deleteCard('${card.id}')" class="text-red-500 hover:text-red-700 bg-red-50 p-1 rounded" title="Sil"><i class="fas fa-trash"></i></button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                    count++;
+                }
+
+                if (count === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Kart bulunamadı.</td></tr>`;
+                }
+            },
+
+            deleteCard: function(cardId) {
+                if(confirm("Bu kartı silmek istediğinize emin misiniz?")) {
+                    this.data.cards = this.data.cards.filter(c => c.id !== cardId);
+                    this.saveData();
+                    this.renderBrowseTable();
+                }
+            },
+
+            // --- STATS ---
+            renderStats: function() {
+                const total = this.data.cards.length;
+                let newC = 0, learnC = 0, reviewC = 0;
+                let dueCount = 0;
+                const now = Date.now();
+
+                this.data.cards.forEach(c => {
+                    if (c.state === 'new') newC++;
+                    else if (c.state === 'learning') {
+                        learnC++;
+                        if (c.dueDate <= now) dueCount++;
+                    }
+                    else if (c.state === 'review') {
+                        reviewC++;
+                        if (c.dueDate <= now) dueCount++;
+                    }
+                });
+
+                document.getElementById('stat-total').innerText = total;
+                document.getElementById('stat-studied-today').innerText = this.data.stats.studiedToday || 0;
+                document.getElementById('stat-due').innerText = dueCount;
+
+                document.getElementById('stat-new-count').innerText = newC;
+                document.getElementById('stat-learn-count').innerText = learnC;
+                document.getElementById('stat-review-count').innerText = reviewC;
+
+                // Progress bar
+                const bar = document.getElementById('stat-bar');
+                bar.innerHTML = '';
+                if (total > 0) {
+                    const wNew = (newC / total) * 100;
+                    const wLearn = (learnC / total) * 100;
+                    const wRev = (reviewC / total) * 100;
+                    
+                    if (wNew > 0) bar.innerHTML += `<div style="width: ${wNew}%" class="bg-blue-500 h-full"></div>`;
+                    if (wLearn > 0) bar.innerHTML += `<div style="width: ${wLearn}%" class="bg-red-500 h-full"></div>`;
+                    if (wRev > 0) bar.innerHTML += `<div style="width: ${wRev}%" class="bg-green-500 h-full"></div>`;
+                }
+            }
+        };
+
+        // Initialize App on Load
+        window.onload = function() {
+            app.init();
+        };
+    </script>
+</body>
+</html>
